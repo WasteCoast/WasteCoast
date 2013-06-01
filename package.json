@@ -1,0 +1,4 @@
+"dependencies": {
+  "express.io": "*",
+  "johnny-five": "*"
+}
