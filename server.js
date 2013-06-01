@@ -1,39 +1,80 @@
 var express = require('express.io'),
-  app  = express(),
-  port = process.env.PORT || 3000,
-  five = require('johnny-five'),
-  board,
-  input_weight
+    app  = express(),
+    port = process.env.PORT || 3000,
+    five = require('johnny-five'),
+    board,
+    input_weight
   ;
+
+
+
+// Process arguments
+var argv = require('optimist')
+  .usage('Start arduino and webserver\nUsage: $0\nArguments:\n' +
+    ' - Arduino input weight min\n' +
+    ' - Arduino input weight max\n' +
+    ' - Max weight in grams'
+  )
+  .demand(3)
+  .argv;
+
+var input_weight_min = argv._[0],
+    input_weight_max = argv._[1],
+    weight_max       = argv._[2];
+
+
+
+
 
 app.http().io();
 
 app.use(express.static(__dirname + '/public'));
 
-app.get('/', function(req, res) {
-  res.sendfile(__dirname + '/public/index.html')
+
+
+
+// Routes
+app.io.route('tare', function(req) {
+  console.log('Tare');
+
+  input_weight_min = input_weight.value;
+  console.log(input_weight.value);
+
+  updateWeight(input_weight_min);
 });
 
-app.io.route('tar', function(req) {
-  console.log('Tar');
-});
+
+function updateWeight(v) {
+
+  // Broadcast to client
+  app.io.broadcast('weight_change', {
+    value: v,
+    time: new Date()
+  });
+
+}
+
+
 
 
 // Arduino
 board = new five.Board();
 
 board.on('ready', function() {
-  console.log('Server started !');
 
   input_weight = new five.Sensor({
     pin: 'A0',
     freq: 250
   });
 
+  // On weight change
   input_weight.on('change', function(err, value) {
-    console.log(value, this.normalized);
+    updateWeight(value);
   });
-});
 
-// Start server
-app.listen(port);
+
+  // Start server
+  app.listen(port);
+  console.log('Server started !');
+
+});
