@@ -2,8 +2,9 @@
   "name": "waste-coast",
   "version": "0.0.1",
   "dependencies": {
-    "express.io": "*",
+    "express":     "*",
+    "socket.io":   "*",
     "johnny-five": "*",
-    "optimist": "*"
+    "optimist":    "*"
   }
 }
