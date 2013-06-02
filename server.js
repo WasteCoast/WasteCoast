@@ -12,35 +12,26 @@ var
 
   // Balance logic
   balance = require('./balance'),
-  prev_weight, weight, total_weight = 0
+  actual_weight,
+  previous_weight,
+  total_weight = { value: 0, date: '2013-05-28T18:50:33.154Z' }
 
   ;
 
 
-var histo = [
-  { val: 0,    date:  '', in_min: false, in_max: false },
-  { val: 121,  date:  '', in_min: false, in_max: false },
-  { val: 434,  date:  '', in_min: false, in_max: false },
-  { val: 510,  date:  '', in_min: false, in_max: false },
-  { val: 790,  date:  '', in_min: false, in_max: false },
-  { val: 987,  date:  '', in_min: false, in_max: false },
-  { val: 1140, date:  '', in_min: false, in_max: false },
-  { val: 0,    date:  '', in_min: false, in_max: false },
-  { val: 179,  date:  '', in_min: false, in_max: false },
-  { val: 582,  date:  '', in_min: false, in_max: false },
-  { val: 893,  date:  '', in_min: false, in_max: false },
-  { val: 1209, date:  '', in_min: false, in_max: false },
-  { val: 1534, date:  '', in_min: false, in_max: false },
-  { val: 2504, date:  '', in_min: false, in_max: false },
-  { val: 3490, date:  '', in_min: false, in_max: false },
-  { val: 4203, date:  '', in_min: false, in_max: false },
-  { val: 4534, date:  '', in_min: false, in_max: false },
-  { val: 5000, date:  '', in_min: false, in_max: true }
+// Historic
+var historic = [
+  { value: 4389, date: '2013-04-30T19:47:58.154Z' },
+  { value: 4245, date: '2013-05-07T20:17:33.154Z' },
+  { value: 4985, date: '2013-05-14T22:12:39.154Z' },
+  { value: 4384, date: '2013-05-21T18:55:01.154Z' },
+  { value: 4534, date: '2013-05-28T18:50:33.154Z' }
 ];
 
-histo.forEach(function(v) {
-  total_weight += v.val;
+historic.forEach(function(v) {
+  total_weight.value += v.value;
 });
+
 
 
 
@@ -66,18 +57,19 @@ balance.calibrate(1768, 353, 10, 827);
 
 
 
-// Server, Websockets
+// Server
 app.use(express.static(__dirname + '/public'));
 
+// Websockets
 io.sockets.on('connection', function (socket) {
 
-  socket.emit('histo', { histo: histo });
-  // TODO Emit initial weight
-  //socket.emit('', { histo: histo });
-
+  socket.emit('init', {
+    actual: actual_weight,
+    total:  total_weight,
+    historic:  historic
+  });
 
   socket.on('tare', function (data) {
-
     if (weight_sensor) {
       balance.tare(weight_sensor.value);
       console.log('Tare balance ok');
@@ -85,8 +77,47 @@ io.sockets.on('connection', function (socket) {
       console.log('Tare balance ko')
     }
   });
-
 });
+
+
+/**
+ * Update actual weight from arduino and add check to add to histo
+ * @param v
+ */
+function updateWeight(v) {
+
+  previous_weight = actual_weight;
+
+  actual_weight = balance.getWeight(v);
+
+  var weight_change = {
+    actual: actual_weight
+  }
+
+  console.log('weight sensor value: ' + v + ', actual weight in grams: ' + actual_weight.value);
+
+  // If actual_weight is lower than previous weight, we add an entry to historic and updates total
+  if (previous_weight && actual_weight.value < previous_weight.value) {
+
+    var delta = previous_weight.value - actual_weight.value;
+
+    // Add entry historic
+    var historic_entry = {
+      value: delta,
+      date:  new Date()
+    };
+    historic.push(historic_entry);
+    weight_change.historic_entry = historic_entry;
+
+    // Updates total weight
+    total_weight.value += delta;
+    total_weight.date = historic_entry.date;
+    weight_change.total = total_weight;
+  }
+
+  io.sockets.emit('weight_change', weight_change);
+}
+
 
 
 
@@ -97,34 +128,17 @@ board.on('ready', function() {
 
   weight_sensor = five.Sensor({
     pin:  'A0',
-    freq: 250 // Check every 1/4 seconds
+    freq: 1000 // Check every seconds
   });
-
 
   weight_sensor.on('change', function(err, value) {
-
-    console.log('weight sensor value: ' + value);
-
-    prev_weight = weight;
-
-    weight = balance.getWeight(value);
-
-    if (!prev_weight || prev_weight.val !== weight.val) {
-      console.log(weight);
-    }
-
-    // TODO add diff between prev_weight and actual weight
-    //weight.total = total_weight = ...;
-
-    io.sockets.emit('weight_change', weight);
-
+    updateWeight(value);
   });
 
-  // TODO Define actual weight before start
-
+  // Define initial weight
+  previous_weight = actual_weight = balance.getWeight(weight_sensor.value);
 
   // Start server
   console.log('Server started !');
   server.listen(3000);
-
 });

@@ -31,9 +31,6 @@ exports = module.exports = {
 
     coeff = Math.round(parseFloat(w) / (parseFloat(inw) - parseFloat(in_weight_min)));
 
-    console.log(w, parseFloat(inw) - parseFloat(in_weight_min), coeff);
-
-
     return true;
   },
 
@@ -42,7 +39,7 @@ exports = module.exports = {
   },
 
   /**
-   * @param inweight arduino input weight actual
+   * @param inw arduino input weight actual
    * @return int
    */
   getWeight: function(inw) {
@@ -51,10 +48,9 @@ exports = module.exports = {
       return false;
     }
 
-    console.log((inw - in_weight_min) * coeff);
-
     return {
-      actual: parseInt((inw - in_weight_min) * coeff),
+      value:  parseInt((inw - in_weight_min) * coeff),
+      date:   new Date(),
       in_min: inw <= in_weight_min,
       in_max: inw >= in_weight_max
     };
